@@ -1,53 +1,87 @@
 #include <SPI.h>
+
+/// Debug
+#define DEBUG
+#ifdef DEBUG
+  #define LOG(...)    Serial.print(__VA_ARGS__)
+  #define LOGLN(...)  Serial.println(__VA_ARGS__)
+#else
+  #define LOG(...)    // no-op
+  #define LOGLN(...)  //
+#endif
+
+/// Arduino 
+const int PIN_POT = 2; // Pot
+const int PIN_CS = 10; // Clock sync - MCP 4822 12-bit DAC
+const int GAIN_1 = 0x1; // UNUSED (?) - HIGH - SPI Output GAIN channel
+const int GAIN_2 = 0x0; // LOW - SPI Output GAIN channel
+const int PIN_RELAY = 9; // Relay - Controls pen up/down
+
+/// Coordinate / Dimensions
+const int MIN_DIM = 0;
+const int MAX_DIM= 4096;
+const int INSET = 128; // Inset increment
+const float X_INSET_MULT = 8.3;  // Inset values for calibrated center (2048, 2048)
+const float Y_INSET_MULT = 12.2; //
+
+// Drawing
+const int DELAY = 20;
  
-const int PIN_CS = 10;
-const int GAIN_1 = 0x1;
-const int GAIN_2 = 0x0;
-const int PIN_STICK_X = 0;
-const int PIN_STICK_Y = 1;
-
-const int W_INSET = 128;
-const int H_INSET = 128 * 6;
-
-const int W_INSET_LETTER = 128 * 4;
-const int H_INSET_LETTER = 128 * 7;
-
-const bool LOOP_ENABLED = false;
-const bool DEBUG = true;
-
-// Joystick values
-int stickX = 0;
-int stickY = 0;
-
-// Current position
-int x = 2048;
-int y = 2048;
- 
-void setup()
-{
+void setup() {
   Serial.begin(9600); 
   pinMode(PIN_CS, OUTPUT);
+  pinMode(PIN_RELAY, OUTPUT);
   SPI.begin();  
   SPI.setClockDivider(SPI_CLOCK_DIV2);
+
+//  int pos = 128 * 16;
+//  setPos(pos, pos);
 }
 
 // MARK: - Loop
  
-void loop()
-{
-  readValues();
-  setPosFromJoystick(stickX, stickY);
-  
-  if (!LOOP_ENABLED) { return; }
+void loop() {
   diagonalLoop();
 }
 
 void diagonalLoop() {
+  // Forward 
   for (int i = 0; i < 4096; i += (4096 / 256)) {
     setPos(i, i);
-    delay(25);
+
+    if (i > 1000 && i < 3000) {
+      penDown();
+    } else {
+      penUp();
+    }
+    
+    delay(DELAY);
+  }
+
+  // Reverse
+  for (int i = 4096; i > 0; i -= (4096 / 256)) {
+    setPos(i, i);
+
+    if (i > 1000 && i < 3000) {
+      penDown();
+    } else {
+      penUp();
+    }
+    
+    delay(DELAY);
   }
 }
+
+// MARK: - Pen Controls
+
+void penUp() {
+  digitalWrite(PIN_RELAY, LOW);
+}
+
+void penDown() {
+  digitalWrite(PIN_RELAY, HIGH);
+}
+
 
 // MARK: - Scaling, Position 
 
@@ -57,50 +91,32 @@ void setPos(int x, int y) {
   setYPos(y);
 }
 
-void setPosFromJoystick(int x, int y) {
-  setPos(x * 4, (1024 - y) * 4);
-}
-
 // Sets the `x` axis to the given position [0, 4096].
 void setXPos(int x) {
   int scaledPos = scaledXPos(x);
-//  log("> x: " + String(x) + " => " + String(scaledPos));
   setOutput(0, GAIN_2, 1, scaledPos);
 }
 
 // Sets the `y` axis to the given position [0, 4096].
 void setYPos(int y) {
   int scaledPos = scaledYPos(y);
-//  log("> y: " + String(y) + " => " + String(scaledPos));
   setOutput(1, GAIN_2, 1, scaledPos);
 }
 
 // Scales the [0, 4096] input position to the `x` axis' calibrated/scaled/inset position.
 int scaledXPos(int x) {
-  int width = 4096 - W_INSET * 2;
-  return W_INSET + (float(x) / 4096) * width;
+  return scaledPosition(x, INSET, X_INSET_MULT);
 }
 
 // Scales the [0, 4096] input position to the `Y` axis' calibrated/scaled/inset position.
 int scaledYPos(int y) {
-  int height = 4096 - H_INSET * 2;
-  return H_INSET + (float(y) / 4096) * height;
+  return scaledPosition(y, INSET, Y_INSET_MULT);
 }
 
-
-// MARK: - Joystick
-
-int scaledJoystickValue(int value) {
-  return (value * 9 / 1024) + 48;
-}
-
-void readValues() {
-  stickX = analogRead(PIN_STICK_X);
-  delay(100); // delay to prevent duplicate read
-  stickY = analogRead(PIN_STICK_Y);
-  delay(100);
-
-  log("(" + String(stickX) + ", " + String(stickY) + ")");
+int scaledPosition(int pos, int inset, float insetMultiplier) {
+  float scaledInset = inset * insetMultiplier;
+  float dimension = MAX_DIM - scaledInset;
+  return (scaledInset / 2.0) + (float(pos) / MAX_DIM) * dimension;
 }
 
 
@@ -119,9 +135,4 @@ void setOutput(byte channel, byte gain, byte shutdown, unsigned int val)
   SPI.transfer(highByte);
   SPI.transfer(lowByte);
   PORTB |= 0x4;
-}
-
-void log(String text) {
-  if (!DEBUG) { return; }
-  Serial.println(text);
 }
