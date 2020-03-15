@@ -19,9 +19,9 @@ const int PIN_RELAY = 9; // Relay - Controls pen up/down
 
 /// Coordinate / Dimensions
 const int MIN_DIM = 0;
-const int MAX_DIM= 4096;
+const int MAX_DIM = 4096;
 const int INSET = 128; // Inset increment
-const float X_INSET_MULT = 8.3;  // Inset values for calibrated center (2048, 2048)
+const float X_INSET_MULT = 8.3;  // Inset coefficientsfor calibrated center (2048, 2048)
 const float Y_INSET_MULT = 12.2; //
 
 // Drawing
@@ -45,8 +45,10 @@ void loop() {
 }
 
 void diagonalLoop() {
+  int stepSize = (MAX_DIM / 256);
+  
   // Forward 
-  for (int i = 0; i < 4096; i += (4096 / 256)) {
+  for (int i = MIN_DIM; i < MAX_DIM; i += stepSize) {
     setPos(i, i);
 
     if (i > 1000 && i < 3000) {
@@ -59,7 +61,7 @@ void diagonalLoop() {
   }
 
   // Reverse
-  for (int i = 4096; i > 0; i -= (4096 / 256)) {
+  for (int i = MAX_DIM; i > MIN_DIM; i -= stepSize) {
     setPos(i, i);
 
     if (i > 1000 && i < 3000) {
