@@ -103,7 +103,7 @@ def test_setup_guide_saves_the_ruler_scale(tmp_path):
     answers = iter(["", "", "2", "8", "10", "13.5", "n"])  # start, rulers yes, 4 readings, no tuning sheet
     said = []
 
-    guide.run(config, lambda: Plotter(SimTransport(sim.build())), sim=True,
+    guide.run(config, lambda: Plotter(SimTransport(sim.build())),
               ask=lambda prompt: next(answers), say=said.append)
 
     saved = load(path)

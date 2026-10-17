@@ -50,6 +50,15 @@ def position_mm(plotter: Plotter, config: Config) -> complex:
     return complex(*config.to_mm(status.x, status.y))
 
 
+def rest(plotter: Plotter, config: Config):
+    """Lifts the pen and moves it to the paper's lower-left corner. Every connection
+    restarts the Uno, and while it restarts the pen relay drops and the pen dips once
+    wherever it is: resting at the corner keeps that dot off the drawing."""
+    plotter.send("U")
+    plotter.run(planner.move_to(config, position_mm(plotter, config), 0j).commands)
+    plotter.wait_idle()
+
+
 class Stopped(Exception):
     pass
 

@@ -70,7 +70,7 @@ hatch lines). Anything too big for the paper is shrunk to fit, with a note.
 
 Paper: `--paper letter` (default), `a4`, `a5`, `half-letter`, `max` (the whole 15 × 10"
 bed) or a size like `200x150` (mm) or `8x6in`; add `-portrait` to turn it. Every size is
-centered where the pen parks at boot.
+centered on the same spot; `plot park` shows where its lower-left corner goes.
 
 `uv run plot dance` shows off: a minute of figure eights, spirals, a rose, a heart and
 "HI!" written in the air, with the pen up and the pen-lift relay keeping the beat.
@@ -99,16 +99,16 @@ the panel, and read drawings from the panel side.
 
 ## Setting up paper
 
-With paper and a pen in, `uv run plot setup` does the whole first-time pass in about 6
-minutes: it checks that connecting no longer restarts the Arduino, sets the scale from
-the bed's rulers, draws the tuning sheet and saves the speed and pen timing you pick.
-The steps below are the same thing by hand.
+With paper and a pen in, `uv run plot setup` does the first-time pass in about 6
+minutes: it sets the scale from the bed's rulers, draws the tuning sheet and saves the
+speed and pen timing you pick. The steps below are the same thing by hand.
 
-1. `uv run plot status` and check it answers. On boot the pen parks at mid-scale, which
-   is the center of the paper.
+1. `uv run plot park` moves the pen to where the paper's lower-left corner goes (and
+   checks the plotter answers).
 2. With no pen in: `uv run plot pen down`, then `uv run plot pen up`. If "down" lifts the
    holder, run `uv run plot pen flip` (saved on the Arduino).
-3. Center a letter sheet under the parked pen. The bed's suction holds it.
+3. Put a letter sheet down, landscape, with its lower-left corner under the pen tip.
+   The bed's suction holds it.
 4. `uv run plot jog`, then `t` traces the paper's edge with the pen up. If it's off,
    jog the pen over the paper's lower-left corner and press `o` to save that as the
    origin. Arrows move the pen; up arrow is +Y.
@@ -118,7 +118,8 @@ The steps below are the same thing by hand.
    - `uv run plot calibrate` (with a pen) draws an L of known size and asks for the
      lengths you measure.
 
-   Both save to `plotter.toml` and keep the paper centered where the pen parks.
+   Both save to `plotter.toml`. The paper's center stays put, so its corner moves a
+   little: run `plot park` again before placing paper.
 6. With a new pen, `uv run plot tune` draws a tuning sheet: the same shapes at six
    speeds, and rows of dashes with five pen timings, each labeled. Set `draw_speed` to
    the fastest that still looks clean, and `pen_down_ms` / `pen_up_ms` to the shortest
@@ -150,11 +151,13 @@ If the pen is left down with nothing to do for 10 s, the firmware lifts it. The 
 line's `late=` counts how often the queue ran dry before a timed move: once per job is
 normal, more means the Mac fell behind and the pen paused mid-stroke.
 
-The first connection after plugging the Arduino in restarts it: the pen lifts and parks
-mid-bed. Later connections don't (the Mac leaves DTR up when it closes the port), so
-the pen stays where the last job left it. During a restart pin 9 floats and the relay
-drops, which with the current wiring dips the pen once wherever it is; swapping the
-relay's NO and NC wires (then `plot pen flip`) makes a dropped relay mean pen up.
+Every connection restarts the Uno: macOS raises DTR whenever the port opens, and
+that's wired to the Uno's reset. While it restarts, pin 9 floats and the relay drops,
+which with the current wiring dips the pen once wherever it is. So every command ends
+with the pen resting at the paper's lower-left corner, where that dot is harmless.
+The real fix is swapping the relay's NO and NC wires (then `plot pen flip`), so a
+dropped relay means pen up. The studio page keeps one connection open, so it
+restarts the Uno only when it starts.
 
 ## Hardware notes
 

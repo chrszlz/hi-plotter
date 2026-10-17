@@ -23,7 +23,7 @@ COMMAND_HELP = {
     "tune": "draw a tuning sheet to pick the best speed and pen timing for a pen",
     "dance": "a minute of choreography with the pen up, to show the plotter off",
     "fonts": "list fonts, or search them: `plot fonts avenir`",
-    "setup": "guided: check restarts, set the scale from the rulers, tune speed and pen timing",
+    "setup": "guided first session: set the scale from the rulers, then tune speed and pen timing",
     "jog": "move the pen with the keyboard and set the paper origin",
     "pen": "pen up / down, or flip which relay level lifts it",
     "park": "lift the pen and go to the paper origin",
@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None):
     parser.add_argument("--dry-run", action="store_true", help="plan only, don't connect")
     parser.add_argument("--preview", type=Path, metavar="FILE", help="write a .png or .svg of the planned job")
     parser.add_argument("--paper", help="letter (default), a4, a5, half-letter, max, WxH in mm; "
-                                        "add -portrait to turn it. Centered where the pen parks")
+                                        "add -portrait to turn it. Centered on the bed; `plot park` shows its corner")
     parser.add_argument("--port", help="serial port (default: plotter.toml, else auto-detect)")
     parser.add_argument("--config", type=Path, help="settings file (default: plotter.toml)")
     commands = parser.add_subparsers(dest="command", required=True, metavar="command")
@@ -211,7 +211,8 @@ def run_job(args, config: Config, make_job):
         jobs.stream(plotter, job, progress)
         print("\r  done" + " " * 30)
     except jobs.Stopped:
-        print("\nStopped. Pen lifted.")
+        jobs.rest(plotter, config)
+        print("\nStopped. Pen lifted and moved to the paper corner.")
         sys.exit(130)
     finish_sim(args, config, plotter)
 
@@ -282,8 +283,10 @@ def cmd_dance(args, config: Config):
         print("  (bows)")
     except KeyboardInterrupt:
         plotter.stop()
-        print("\nStopped. Pen lifted.")
+        jobs.rest(plotter, config)
+        print("\nStopped. Pen lifted and moved to the paper corner.")
         sys.exit(130)
+    jobs.rest(plotter, config)
     finish_sim(args, config, plotter)
 
 
@@ -315,6 +318,7 @@ def cmd_status(args, config: Config):
           f"at DAC ({status.x}, {status.y}) = ({x:.1f}, {y:.1f}) mm from the paper origin")
     level = plotter.pen_up_level()
     print(f"Relay pin {'HIGH' if level else 'LOW'} lifts the pen (`plot pen flip` swaps it)")
+    jobs.rest(plotter, config)
 
 
 def cmd_pen(args, config: Config):
@@ -328,32 +332,34 @@ def cmd_pen(args, config: Config):
         print("Pen down. The firmware lifts it again after 10 s with nothing to do.")
         if not args.sim:
             time.sleep(10.5)
-    else:
-        plotter.send("U")
+    jobs.rest(plotter, config)
     finish_sim(args, config, plotter)
 
 
 def cmd_jog(args, config: Config):
-    jog.run(connect(args, config), config)
+    plotter = connect(args, config)
+    jog.run(plotter, config)
+    jobs.rest(plotter, config)
 
 
 def cmd_park(args, config: Config):
     plotter = connect(args, config)
-    plotter.send("U")
-    plotter.run(planner.move_to(config, jobs.position_mm(plotter, config), 0j).commands)
-    plotter.wait_idle()
+    jobs.rest(plotter, config)
+    print("The pen is where the paper's lower-left corner goes.")
     finish_sim(args, config, plotter)
 
 
 def cmd_setup(args, config: Config):
-    guide.run(config, lambda: connect(args, config), sim=args.sim)
+    guide.run(config, lambda: connect(args, config))
 
 
 def cmd_calibrate(args, config: Config):
     """Draws an L of known nominal size; the measured lengths give the true scale.
     With --rulers, reads the plotter's own rulers instead (no pen needed)."""
     if args.rulers:
-        calibration.with_rulers(connect(args, config), config)
+        plotter = connect(args, config)
+        calibration.with_rulers(plotter, config)
+        jobs.rest(plotter, config)
         return
 
     m = config.margin
@@ -382,7 +388,7 @@ def cmd_calibrate(args, config: Config):
         print(f"  {axis.upper()}: {old:.4f} -> {new:.4f} counts/mm ({(new / old - 1) * 100:+.2f}%)")
     if scales:
         config.save(**config.rescaled(**scales))
-        print("Saved to plotter.toml. The paper stays centered where the pen parks.")
+        print("Saved to plotter.toml. Run `plot park` to see where the paper's corner goes now.")
 
 
 def cmd_send(args, config: Config):

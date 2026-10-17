@@ -102,7 +102,10 @@ class Studio:
                 jobs.stream(plotter, job, progress, self.stop_event)
             self.state = {"state": "idle", "progress": 1.0, "left": 0.0, "message": f"Done: {job.drawing.name}"}
         except jobs.Stopped:
-            self.state = {"state": "idle", "progress": 0.0, "left": 0.0, "message": "Stopped. Pen lifted."}
+            with self.device_lock:
+                jobs.rest(plotter, config)
+            self.state = {"state": "idle", "progress": 0.0, "left": 0.0,
+                          "message": "Stopped. Pen lifted and moved to the paper corner."}
         except Exception as error:  # report anything to the page rather than dying silently
             self.state = {"state": "error", "progress": 0.0, "left": 0.0, "message": str(error)}
             self._disconnect()
@@ -112,6 +115,7 @@ class Studio:
         if not self.busy and self.plotter:
             with self.device_lock:
                 self.plotter.stop()
+                jobs.rest(self.plotter, self.config)
         return {"ok": True}
 
     def pen(self, request: dict) -> dict:
@@ -121,9 +125,20 @@ class Studio:
 
     def park(self) -> dict:
         with self._idle_device() as plotter:
-            plotter.send("U")
-            plotter.run(planner.move_to(self.config, jobs.position_mm(plotter, self.config), 0j).commands)
+            jobs.rest(plotter, self.config)
         return {"ok": True}
+
+    def close(self):
+        """Leaves the pen at the paper corner (see jobs.rest) and disconnects."""
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join(timeout=5)
+        if self.plotter:
+            try:
+                with self.device_lock:
+                    jobs.rest(self.plotter, self.config)
+            finally:
+                self._disconnect()
 
     def status(self) -> dict:
         return {**self.state, "connected": self.plotter is not None, "sim": self.sim_mode}
@@ -261,5 +276,5 @@ def serve(config: Config, sim_mode: bool = False, port: int = 8800, open_browser
     except KeyboardInterrupt:
         print()
     finally:
-        studio.stop()
+        studio.close()
         server.server_close()

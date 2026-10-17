@@ -7,7 +7,7 @@ baud = 115200
 [calibration]
 # DAC counts at the paper origin (lower-left corner of the paper). Set it with
 # `plot jog`, then `o`. These put the center of a letter sheet at mid-scale,
-# where the pen parks at boot: center the paper under the parked pen.
+# where the pen parks at boot. `plot park` shows where the corner goes.
 origin_x = 948
 origin_y = 1198
 # DAC counts per mm. With the plotter's range knobs on 200 mV/in this is

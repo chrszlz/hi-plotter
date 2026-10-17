@@ -3,7 +3,6 @@
 import queue
 import re
 import subprocess
-import termios
 import threading
 import time
 from collections.abc import Callable, Iterable
@@ -40,7 +39,9 @@ class Status:
 
 class SerialTransport:
     def __init__(self, port: str, baud: int):
-        # Exclusive, so a second program can't interleave commands with this one.
+        # Opening the port restarts the Uno (macOS raises DTR on every open, whatever
+        # the termios settings). Exclusive, so a second program can't interleave
+        # commands with this one.
         try:
             self.serial = serial.Serial(port, baud, timeout=0.05, exclusive=True)
         except serial.SerialException as error:
@@ -49,21 +50,7 @@ class SerialTransport:
                 f"{port} is in use by another program (is `plot ui` running?)" if busy
                 else f"Can't open {port}: {error}"
             ) from error
-        self._keep_dtr_on_close()
         self.buffer = b""
-
-    def _keep_dtr_on_close(self):
-        """The Uno resets whenever DTR rises, and the OS drops DTR when the port closes,
-        so every connection would restart it (and during the restart the pen relay
-        floats, which can dot the paper). Keeping DTR up after closing means only the
-        first connection after plugging in restarts it."""
-        try:
-            fd = self.serial.fileno()
-            attributes = termios.tcgetattr(fd)
-            attributes[2] &= ~termios.HUPCL
-            termios.tcsetattr(fd, termios.TCSANOW, attributes)
-        except (termios.error, OSError, ValueError):
-            pass
 
     def write(self, data: bytes):
         self.serial.write(data)
@@ -147,16 +134,25 @@ class Plotter:
     def open(cls, port: str, baud: int, **kwargs) -> "Plotter":
         return cls(SerialTransport(port or find_port(), baud), **kwargs)
 
-    def wait_ready(self, timeout: float = 2.5):
-        """Waits for the banner the firmware prints on boot. If the board didn't restart
-        (see SerialTransport), asks for its version instead."""
+    def wait_ready(self, timeout: float = 3.0):
+        """Asks for status straight away. A board that's already running answers at once;
+        one that's restarting misses the question in its bootloader and prints its
+        banner when the firmware is up."""
+        self.transport.write(b"?")
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             line = self.transport.readline(0.2)
-            if line is not None and line.startswith(BANNER):
-                self.restarted = True
+            if line is None:
+                continue
+            if STATUS.match(line):
                 return
-        # No banner: the board didn't reset on connect. Ask instead.
+            if line.startswith(BANNER):
+                self.restarted = True
+                # If the question did reach the fresh firmware, drop its answer so it
+                # isn't mistaken for the reply to a later one.
+                self.transport.readline(0.3)
+                return
+        # Neither: ask for the version in case a line got lost.
         self.transport.write(b"\nV\n")
         for _ in range(20):
             line = self.transport.readline(0.25)

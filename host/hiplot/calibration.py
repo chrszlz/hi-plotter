@@ -23,7 +23,7 @@ def ruler_scale(readings: list[tuple[float, float]]) -> tuple[float, float]:
 def with_rulers(plotter: Plotter, config: Config, ask: Callable[[str], str] = input,
                 say: Callable[[str], None] = print):
     """Moves the pen to two spots, asks what the rulers read there, and saves the scale
-    (keeping the paper centered where the pen parks)."""
+    (keeping the paper's center where it is)."""
     plotter.send("U")
     say("For each spot, read where the pen tip sits on the X ruler (along the bed's edge,"
         " the arm's position) and the Y ruler (on the arm), in inches.")
@@ -37,4 +37,4 @@ def with_rulers(plotter: Plotter, config: Config, ask: Callable[[str], str] = in
     say(f"X: {config.counts_per_mm_x:.4f} -> {per_mm_x:.4f} counts/mm, "
         f"Y: {config.counts_per_mm_y:.4f} -> {per_mm_y:.4f} counts/mm")
     config.save(**config.rescaled(per_mm_x, per_mm_y))
-    say("Saved to plotter.toml. The paper stays centered where the pen parks.")
+    say("Saved to plotter.toml. Run `plot park` to see where the paper's corner goes now.")
