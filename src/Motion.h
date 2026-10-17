@@ -21,8 +21,9 @@ namespace Motion
     uint16_t ms;   // move or wait duration; a 0 ms move jumps
   };
 
-  // Writes the starting position to the DAC.
-  void begin(uint16_t x, uint16_t y);
+  // Writes the starting position to the DAC: where the pen was before a reset, or the
+  // park position after power-up. Returns whether it resumed.
+  bool begin(uint16_t parkX, uint16_t parkY);
 
   bool hasRoom();
   void push(const Command &command);

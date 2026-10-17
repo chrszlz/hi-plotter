@@ -4,6 +4,12 @@
 #include "Pen.h"
 #include "config.h"
 
+#ifdef __AVR__
+#define SURVIVES_RESET __attribute__((section(".noinit")))
+#else
+#define SURVIVES_RESET // the simulator has no resets to survive
+#endif
+
 namespace
 {
   Motion::Command queue[QUEUE_SIZE];
@@ -13,6 +19,31 @@ namespace
   // Last position written to the DAC.
   uint16_t posX = 0;
   uint16_t posY = 0;
+
+  // The DAC position again, in RAM that a reset leaves alone (only power-up scrambles
+  // it). The Mac restarts the Uno every time it connects; this lets the pen stay where
+  // it was instead of driving back to the park position each time.
+  struct Remembered
+  {
+    uint32_t marker;
+    uint16_t x, y;
+    uint16_t check;
+  };
+  const uint32_t REMEMBERED_MARKER = 0x48504C54; // "HPLT"
+  Remembered remembered SURVIVES_RESET;
+
+  uint16_t checksum(uint16_t x, uint16_t y)
+  {
+    return (uint16_t)(x ^ (y << 1) ^ 0x5A5A);
+  }
+
+  void remember(uint16_t x, uint16_t y)
+  {
+    remembered.x = x;
+    remembered.y = y;
+    remembered.check = checksum(x, y);
+    remembered.marker = REMEMBERED_MARKER;
+  }
 
   // The timed command in progress (a move or a wait).
   bool active = false;
@@ -35,6 +66,7 @@ namespace
       Dac::write(x, y);
       posX = x;
       posY = y;
+      remember(x, y);
     }
   }
 
@@ -87,12 +119,17 @@ namespace
   }
 }
 
-void Motion::begin(uint16_t x, uint16_t y)
+bool Motion::begin(uint16_t parkX, uint16_t parkY)
 {
-  posX = x;
-  posY = y;
-  Dac::write(x, y);
+  bool resumed = remembered.marker == REMEMBERED_MARKER
+                 && remembered.check == checksum(remembered.x, remembered.y)
+                 && remembered.x <= DAC_MAX && remembered.y <= DAC_MAX;
+  posX = resumed ? remembered.x : parkX;
+  posY = resumed ? remembered.y : parkY;
+  Dac::write(posX, posY);
+  remember(posX, posY);
   clockUs = micros();
+  return resumed;
 }
 
 bool Motion::hasRoom()

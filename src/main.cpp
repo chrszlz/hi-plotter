@@ -288,12 +288,13 @@ void setup()
   // Pen first: the relay pin floats during reset, so get it to pen-up right away.
   Pen::begin();
   Dac::begin();
-  Motion::begin(PARK_X, PARK_Y);
+  bool resumed = Motion::begin(PARK_X, PARK_Y);
 
   Serial.begin(SERIAL_BAUD);
   Serial.print(F("# "));
   Serial.print(VERSION);
-  Serial.println(F(" ready, pen up. Send H for help."));
+  Serial.println(resumed ? F(" ready, pen up where it was. Send H for help.")
+                         : F(" ready, pen up and parked. Send H for help."));
   lastActivityMs = millis();
 }
 

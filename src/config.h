@@ -19,7 +19,8 @@ const unsigned long SERIAL_BAUD = 115200;
 // Largest DAC value. At 2x gain the MCP4822 outputs 0-4.095 V, so 1 count = 1 mV.
 const uint16_t DAC_MAX = 4095;
 
-// Where the pen goes at boot, in DAC counts. Mid-scale is roughly the middle of the bed.
+// Where the pen goes at power-up, in DAC counts. Mid-scale is roughly the middle of the
+// bed. After a reset (the Mac connecting) the pen stays where it was instead.
 const uint16_t PARK_X = 2048;
 const uint16_t PARK_Y = 2048;
 
