@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plotter Studio</title>
+<style>
+  :root {
+    --bg: #f4f3ef; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #dddbd4;
+    --accent: #1f5fbf; --accent-ink: #ffffff; --danger: #c0392b; --paper-shadow: rgba(0,0,0,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #18181a; --panel: #222225; --ink: #ecebe6; --muted: #9a9993; --line: #36363a;
+            --accent: #5b9bff; --accent-ink: #0d1420; --danger: #ff6b5b; --paper-shadow: rgba(0,0,0,.5); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px; min-height: 100vh; }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  aside { display: flex; flex-direction: column; gap: 14px; }
+  h1 { font-size: 18px; margin: 0; letter-spacing: -.01em; }
+  h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+          display: flex; flex-direction: column; gap: 10px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  input, select, textarea, button { font: inherit; color: var(--ink); }
+  input, select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+                            padding: 7px 9px; width: 100%; }
+  textarea { min-height: 110px; resize: vertical; font-size: 15px; }
+  input[type=checkbox], input[type=radio] { width: auto; }
+  .check { flex-direction: row; align-items: center; gap: 8px; color: var(--ink); font-size: 13px; }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; background: var(--bg); border-radius: 8px; padding: 3px; }
+  .tabs button { border: 0; background: none; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--muted); }
+  .tabs button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px var(--paper-shadow); }
+  #drop { border: 1.5px dashed var(--line); border-radius: 8px; padding: 22px 10px; text-align: center;
+          color: var(--muted); cursor: pointer; }
+  #drop.over { border-color: var(--accent); color: var(--accent); }
+  #drop strong { color: var(--ink); display: block; word-break: break-all; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0; }
+  .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 8px 12px; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; flex: 1; }
+  button.danger { border-color: var(--danger); color: var(--danger); }
+  section { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  #stage { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 320px; }
+  #stage svg, #sim-stage svg { width: 100%; height: auto; max-height: 78vh; background: white; border-radius: 3px;
+                               box-shadow: 0 2px 12px var(--paper-shadow); }
+  #summary { color: var(--muted); min-height: 20px; }
+  #error { color: var(--danger); }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .progress div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .status { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <aside>
+    <h1>Plotter Studio <small id="mode"></small></h1>
+
+    <div class="card">
+      <div class="tabs">
+        <button id="tab-text" class="on">Text</button>
+        <button id="tab-file">File</button>
+        <button id="tab-builtin">Tests</button>
+      </div>
+
+      <div id="text-panel">
+        <textarea id="text" placeholder="Type something to write…">Hello from the Omnigraphic</textarea>
+      </div>
+
+      <div id="file-panel" hidden>
+        <div id="drop">
+          <strong id="file-name">Drop a file here</strong>
+          or click to choose. SVG, G-code, HPGL, text, or an image.
+        </div>
+        <input id="file" type="file" hidden
+               accept=".svg,.gcode,.nc,.ngc,.gc,.g,.tap,.hpgl,.hpg,.hgl,.plt,.txt,.md,.png,.jpg,.jpeg,.gif,.bmp,.webp,.tif,.tiff">
+      </div>
+
+      <div id="builtin-panel" hidden>
+        <label class="check"><input type="radio" name="builtin" value="test" checked> Test pattern</label>
+        <p class="hint">Square, circle, star, a fan of lines and text: a quick health check.</p>
+        <label class="check"><input type="radio" name="builtin" value="tune"> Tuning sheet</label>
+        <p class="hint">The same shapes at six speeds and dashes with five pen timings, each labeled.
+          Pick the best and set draw_speed, pen_down_ms and pen_up_ms in plotter.toml.</p>
+      </div>
+    </div>
+
+    <div class="card" id="text-options">
+      <h2>Lettering</h2>
+      <label>Font
+        <input id="font" list="font-list" value="futural" autocomplete="off" spellcheck="false">
+        <datalist id="font-list"></datalist>
+      </label>
+      <p class="hint" id="font-hint">Single-stroke fonts (futural, scripts, timesr…) write like a pen. Any installed font works too, drawn as outlines.</p>
+      <div class="row">
+        <label>Size (mm)<input id="size" type="number" min="2" max="200" step="1" value="12"></label>
+        <label>Align
+          <select id="align"><option>left</option><option>center</option><option>right</option></select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Line spacing<input id="lineSpacing" type="number" min="0.8" max="4" step="0.1" value="1.4"></label>
+        <label class="check" style="align-self:end;padding-bottom:8px"><input id="fill" type="checkbox"> Fill outlines</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Page</h2>
+      <div class="row">
+        <label>Paper<select id="paper"></select></label>
+        <label>Orientation
+          <select id="orientation"><option value="">Landscape</option><option value="-portrait">Portrait</option></select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Size
+          <select id="fit">
+            <option value="auto">Automatic</option>
+            <option value="fit">Fill the page</option>
+            <option value="actual">Actual size</option>
+          </select>
+        </label>
+        <label>Rotate
+          <select id="rotate"><option value="0">0°</option><option value="90">90°</option>
+                              <option value="180">180°</option><option value="270">270°</option></select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Scale<input id="scale" type="number" min="0.05" max="10" step="0.05" value="1"></label>
+        <label>Hatch spacing (mm)<input id="hatch" type="number" min="0.3" max="5" step="0.1" value="0.8"></label>
+      </div>
+      <label>Pictures
+        <select id="image">
+          <option value="auto">Automatic</option>
+          <option value="lines">Trace the lines (drawings)</option>
+          <option value="hatch">Crosshatch (photos)</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="buttons">
+        <button id="plot" class="primary">Plot</button>
+        <button id="stop" class="danger" hidden>Stop</button>
+      </div>
+      <div class="buttons">
+        <button id="pen-down">Pen down</button>
+        <button id="pen-up">Pen up</button>
+        <button id="park">Park</button>
+      </div>
+      <div class="progress"><div id="bar"></div></div>
+      <div class="status"><span id="message">Ready</span><span id="left"></span></div>
+    </div>
+  </aside>
+
+  <section>
+    <div id="stage"></div>
+    <div id="summary"></div>
+    <div id="error"></div>
+    <div id="sim" hidden>
+      <div class="card">
+        <h2>Simulator: what the plotter drew</h2>
+        <div id="sim-stage"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let mode = "text";
+let upload = null;
+let previewRequest = null;
+let busy = false;
+
+// MARK: - Request
+
+function request() {
+  const body = {
+    font: $("font").value.trim(),
+    size: $("size").value,
+    align: $("align").value,
+    lineSpacing: $("lineSpacing").value,
+    fill: $("fill").checked,
+    paper: $("paper").value + $("orientation").value,
+    fit: $("fit").value,
+    rotate: $("rotate").value,
+    scale: $("scale").value,
+    hatch: $("hatch").value,
+    image: $("image").value,
+  };
+  if (mode === "builtin") body.builtin = document.querySelector("input[name=builtin]:checked").value;
+  else if (mode === "file" && upload) body.file = upload;
+  else body.text = $("text").value;
+  return body;
+}
+
+async function post(path, body) {
+  const response = await fetch(path, { method: "POST", body: JSON.stringify(body || {}),
+                                       signal: body && body.signal });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || response.statusText);
+  return data;
+}
+
+// MARK: - Preview
+
+let previewTimer = null;
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(updatePreview, 350);
+}
+
+async function updatePreview() {
+  if (mode === "file" && !upload) {
+    $("stage").innerHTML = "";
+    $("summary").textContent = "Drop in a file to see it here.";
+    $("error").textContent = "";
+    return;
+  }
+  if (previewRequest) previewRequest.abort();
+  previewRequest = new AbortController();
+  const body = request();
+  try {
+    const response = await fetch("/api/preview", { method: "POST", body: JSON.stringify(body),
+                                                   signal: previewRequest.signal });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    $("stage").innerHTML = data.svg;
+    $("summary").textContent = data.summary + (data.notes.length ? " — " + data.notes.join(" ") : "");
+    $("error").textContent = "";
+  } catch (error) {
+    if (error.name !== "AbortError") $("error").textContent = error.message;
+  }
+}
+
+// MARK: - Input
+
+function setMode(next) {
+  mode = next;
+  $("tab-text").classList.toggle("on", mode === "text");
+  $("tab-file").classList.toggle("on", mode === "file");
+  $("tab-builtin").classList.toggle("on", mode === "builtin");
+  $("text-panel").hidden = mode !== "text";
+  $("file-panel").hidden = mode !== "file";
+  $("builtin-panel").hidden = mode !== "builtin";
+  const isText = mode === "text" || (mode === "file" && upload && /\.(txt|md|text)$/i.test(upload.name));
+  $("text-options").hidden = !isText;
+  schedulePreview();
+}
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    upload = { name: file.name, data: reader.result.split(",")[1] };
+    $("file-name").textContent = file.name;
+    setMode("file");
+  };
+  reader.readAsDataURL(file);
+}
+
+$("tab-text").onclick = () => setMode("text");
+$("tab-file").onclick = () => setMode("file");
+$("tab-builtin").onclick = () => setMode("builtin");
+for (const radio of document.querySelectorAll("input[name=builtin]")) radio.addEventListener("change", schedulePreview);
+$("drop").onclick = () => $("file").click();
+$("file").onchange = () => $("file").files[0] && readFile($("file").files[0]);
+for (const target of [$("drop"), document.body]) {
+  target.addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+  target.addEventListener("dragleave", () => $("drop").classList.remove("over"));
+  target.addEventListener("drop", (e) => {
+    e.preventDefault();
+    $("drop").classList.remove("over");
+    if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+  });
+}
+for (const id of ["text", "font", "size", "align", "lineSpacing", "fill", "paper", "orientation",
+                  "fit", "rotate", "scale", "hatch", "image"]) {
+  $(id).addEventListener("input", schedulePreview);
+}
+
+// MARK: - Plotter
+
+async function act(path, body) {
+  $("error").textContent = "";
+  try { await post(path, body); } catch (error) { $("error").textContent = error.message; }
+  poll();
+}
+
+$("plot").onclick = () => act("/api/plot", request());
+$("stop").onclick = () => act("/api/stop");
+$("pen-down").onclick = () => act("/api/pen", { down: true });
+$("pen-up").onclick = () => act("/api/pen", { down: false });
+$("park").onclick = () => act("/api/park");
+
+let simTimer = null;
+async function poll() {
+  const status = await (await fetch("/api/status")).json();
+  busy = status.state === "plotting" || status.state === "starting";
+  $("mode").textContent = status.sim ? "simulator" : "";
+  $("sim").hidden = !status.sim;
+  $("plot").disabled = busy;
+  for (const id of ["pen-down", "pen-up", "park"]) $(id).disabled = busy;
+  $("stop").hidden = !busy;
+  $("bar").style.width = `${Math.round((status.progress || 0) * 100)}%`;
+  $("message").textContent = status.message || (busy ? "Plotting" : "Ready");
+  $("message").style.color = status.state === "error" ? "var(--danger)" : "";
+  $("left").textContent = busy && status.left ? `${Math.floor(status.left / 60)}:${String(Math.round(status.left % 60)).padStart(2, "0")} left` : "";
+  if (status.sim) $("sim-stage").innerHTML = await (await fetch("/api/sim.svg")).text();
+  if (busy) setTimeout(poll, 700);
+}
+
+// MARK: - Start
+
+(async () => {
+  const data = await (await fetch("/api/fonts")).json();
+  $("font-list").innerHTML = data.fonts.map((f) => `<option value="${f.name}">${f.kind}</option>`).join("");
+  $("paper").innerHTML = data.papers.map((p) => `<option>${p}</option>`).join("");
+  setMode("text");
+  poll();
+})();
+</script>
+</body>
+</html>
