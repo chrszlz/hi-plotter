@@ -72,6 +72,10 @@ Paper: `--paper letter` (default), `a4`, `a5`, `half-letter`, `max` (the whole 1
 bed) or a size like `200x150` (mm) or `8x6in`; add `-portrait` to turn it. Every size is
 centered on the same spot; `plot park` shows where its lower-left corner goes.
 
+`examples/omnigraphic_poster.py` draws a full-plate poster of this setup: a technical
+drawing of the recorder's front and the wiring diagram (`--preview poster.png` first,
+then `--plot`).
+
 `uv run plot dance` shows off: a minute of figure eights, spirals, a rose, a heart and
 "HI!" written in the air, with the pen up and the pen-lift relay keeping the beat.
 `plot dance --pen` draws it instead, as a spirograph-style picture (about 2 minutes).
