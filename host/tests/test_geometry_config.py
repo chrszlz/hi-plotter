@@ -84,7 +84,7 @@ def test_rescaling_keeps_the_paper_centered():
 
 
 def test_ruler_scale():
-    from hiplot.cli import RULER_POINTS, ruler_scale
+    from hiplot.calibration import RULER_POINTS, ruler_scale
 
     (x0, y0), (x1, y1) = RULER_POINTS
     # 200 counts per inch on X; Y's ruler counts down as the voltage rises.

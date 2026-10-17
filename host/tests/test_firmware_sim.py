@@ -89,3 +89,34 @@ def test_counts_when_the_queue_runs_dry(plotter):
     plotter.send("M 2400 2048 100")  # after a gap: starts late
     plotter.wait_idle()
     assert plotter.status().late == before + 2
+
+
+def test_setup_guide_saves_the_ruler_scale(tmp_path):
+    import shutil as files
+
+    from hiplot import guide
+    from hiplot.config import DEFAULT_PATH, load
+
+    path = tmp_path / "plotter.toml"
+    files.copyfile(DEFAULT_PATH, path)
+    config = load(path)
+    answers = iter(["", "", "2", "8", "10", "13.5", "n"])  # start, rulers yes, 4 readings, no tuning sheet
+    said = []
+
+    guide.run(config, lambda: Plotter(SimTransport(sim.build())), sim=True,
+              ask=lambda prompt: next(answers), say=said.append)
+
+    saved = load(path)
+    assert saved.counts_per_mm_x == pytest.approx(1700 / (8 * 25.4), abs=1e-3)
+    assert saved.counts_per_mm_y == pytest.approx(1100 / (5.5 * 25.4), abs=1e-3)
+    # The paper stays centered where the pen parks.
+    assert saved.to_counts(saved.paper_width / 2, saved.paper_height / 2) == pytest.approx((2048, 2048), abs=1)
+    assert "Try `plot test` next" in said[-1]
+
+
+def test_choosing_a_value_keeps_the_current_one_on_enter():
+    from hiplot.guide import _choose
+
+    answers = iter(["fast", "100"])
+    assert _choose(lambda prompt: next(answers), "Speed", [50, 100], 50) == 100
+    assert _choose(lambda prompt: "", "Speed", [50, 100], 50) == 50

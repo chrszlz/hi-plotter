@@ -139,6 +139,8 @@ class Plotter:
     def __init__(self, transport, log: Callable[[str], None] = lambda line: None):
         self.transport = transport
         self.log = log
+        # Whether connecting restarted the board (it announced itself) or found it running.
+        self.restarted = False
         self.wait_ready()
 
     @classmethod
@@ -152,6 +154,7 @@ class Plotter:
         while time.monotonic() < deadline:
             line = self.transport.readline(0.2)
             if line is not None and line.startswith(BANNER):
+                self.restarted = True
                 return
         # No banner: the board didn't reset on connect. Ask instead.
         self.transport.write(b"\nV\n")

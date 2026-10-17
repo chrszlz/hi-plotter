@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import dance, fonts, geometry, jog, jobs, planner, preview, sim, sources, tuning
+from . import calibration, dance, fonts, geometry, guide, jog, jobs, planner, preview, sim, sources, tuning
 from .config import Config, load
 from .device import Plotter, PlotterError, SimTransport
 
@@ -23,6 +23,7 @@ COMMAND_HELP = {
     "tune": "draw a tuning sheet to pick the best speed and pen timing for a pen",
     "dance": "a minute of choreography with the pen up, to show the plotter off",
     "fonts": "list fonts, or search them: `plot fonts avenir`",
+    "setup": "guided: check restarts, set the scale from the rulers, tune speed and pen timing",
     "jog": "move the pen with the keyboard and set the paper origin",
     "pen": "pen up / down, or flip which relay level lifts it",
     "park": "lift the pen and go to the paper origin",
@@ -344,45 +345,15 @@ def cmd_park(args, config: Config):
     finish_sim(args, config, plotter)
 
 
-# Two DAC positions comfortably inside the bed with the knobs as in the README.
-RULER_POINTS = [(1200, 1500), (2900, 2600)]
-
-
-def ruler_scale(readings: list[tuple[float, float]]) -> tuple[float, float]:
-    """Counts per mm from ruler readings (inches) at the two RULER_POINTS. A ruler that
-    counts down as the voltage goes up gives a negative scale, which flips that axis."""
-    (ax, ay), (bx, by) = readings
-    (cx0, cy0), (cx1, cy1) = RULER_POINTS
-    if ax == bx or ay == by:
-        raise ValueError("The two readings must differ on both rulers")
-    return (cx1 - cx0) / ((bx - ax) * 25.4), (cy1 - cy0) / ((by - ay) * 25.4)
-
-
-def calibrate_with_rulers(args, config: Config):
-    """Moves the pen to two spots and asks for the plotter's own ruler readings there."""
-    plotter = connect(args, config)
-    plotter.send("U")
-    print("For each spot, read where the pen holder sits on the X ruler (along the bed's edge,"
-          " the arm's position) and the Y ruler (on the arm), in inches.")
-    readings = []
-    for x, y in RULER_POINTS:
-        target = complex(*config.to_mm(x, y))
-        plotter.run(planner.move_to(config, jobs.position_mm(plotter, config), target).commands)
-        plotter.wait_idle()
-        readings.append((float(input("  X ruler: ")), float(input("  Y ruler: "))))
-    per_mm_x, per_mm_y = ruler_scale(readings)
-    changes = config.rescaled(per_mm_x, per_mm_y)
-    print(f"X: {config.counts_per_mm_x:.4f} -> {per_mm_x:.4f} counts/mm, "
-          f"Y: {config.counts_per_mm_y:.4f} -> {per_mm_y:.4f} counts/mm")
-    config.save(**changes)
-    print("Saved to plotter.toml. The paper stays centered where the pen parks.")
+def cmd_setup(args, config: Config):
+    guide.run(config, lambda: connect(args, config), sim=args.sim)
 
 
 def cmd_calibrate(args, config: Config):
     """Draws an L of known nominal size; the measured lengths give the true scale.
     With --rulers, reads the plotter's own rulers instead (no pen needed)."""
     if args.rulers:
-        calibrate_with_rulers(args, config)
+        calibration.with_rulers(connect(args, config), config)
         return
 
     m = config.margin
@@ -430,6 +401,7 @@ COMMANDS = {
     "tune": cmd_tune,
     "dance": cmd_dance,
     "fonts": cmd_fonts,
+    "setup": cmd_setup,
     "jog": cmd_jog,
     "pen": cmd_pen,
     "park": cmd_park,

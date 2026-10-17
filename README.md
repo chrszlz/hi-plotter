@@ -99,6 +99,11 @@ the panel, and read drawings from the panel side.
 
 ## Setting up paper
 
+With paper and a pen in, `uv run plot setup` does the whole first-time pass in about 6
+minutes: it checks that connecting no longer restarts the Arduino, sets the scale from
+the bed's rulers, draws the tuning sheet and saves the speed and pen timing you pick.
+The steps below are the same thing by hand.
+
 1. `uv run plot status` and check it answers. On boot the pen parks at mid-scale, which
    is the center of the paper.
 2. With no pen in: `uv run plot pen down`, then `uv run plot pen up`. If "down" lifts the
