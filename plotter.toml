@@ -1,0 +1,35 @@
+# Settings for `uv run plot`. The jog and calibrate commands update this file.
+
+[serial]
+port = ""        # empty = find the Arduino automatically
+baud = 115200
+
+[calibration]
+# DAC counts at the paper origin (lower-left corner of the paper). Set it with
+# `plot jog`, then `o`. These put the center of a letter sheet at mid-scale,
+# where the pen parks at boot: center the paper under the parked pen.
+origin_x = 948
+origin_y = 1198
+# DAC counts per mm. With the plotter's range knobs on 200 mV/in this is
+# 200 counts per inch = 7.874. `plot calibrate` measures it. A negative value
+# flips an axis that moves the wrong way.
+counts_per_mm_x = 7.874
+counts_per_mm_y = 7.874
+
+[paper]
+# Letter, landscape. Drawings are kept inside the margin.
+width = 279.4
+height = 215.9
+margin = 10.0
+
+[motion]
+draw_speed = 50.0     # mm/s with the pen down
+travel_speed = 150.0  # mm/s with the pen up
+accel = 1000.0        # mm/s²
+cornering = 0.05      # mm; larger = faster but rounder corners
+sample_ms = 15        # length of each timed segment sent to the firmware
+
+[pen]
+down_ms = 250         # wait after lowering the pen (`plot tune` finds the best value)
+up_ms = 400           # wait after lifting the pen; this pen lift is slowish
+settle_ms = 60        # wait for the servos to catch up before the pen moves
